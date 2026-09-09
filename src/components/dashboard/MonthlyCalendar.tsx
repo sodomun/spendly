@@ -8,9 +8,15 @@ interface MonthlyCalendarProps {
   selectedDate: Date;
   topExpenseDays?: string[];
   topDays?: string[];
+  dailyTotals?: Record<string, number>;
   onSelectDate: (date: Date) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
+}
+
+function formatCompact(amount: number): string {
+  if (amount >= 10000) return `${(amount / 10000).toFixed(1)}万`;
+  return amount.toLocaleString();
 }
 
 export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
@@ -18,6 +24,7 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
   selectedDate,
   topExpenseDays,
   topDays,
+  dailyTotals = {},
   onSelectDate,
   onPrevMonth,
   onNextMonth,
@@ -98,13 +105,14 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
           const isTop3 = safeTopDays.includes(dateKey);
           const isSelected = selectedKey === dateKey;
           const isToday = todayKey === dateKey;
+          const total = dailyTotals[dateKey] ?? 0;
 
           return (
             <button
               key={dateKey}
               type="button"
               onClick={() => onSelectDate(targetDate)}
-              className={`h-10 rounded-xl flex flex-col items-center justify-center relative transition-all text-xs ${
+              className={`h-14 rounded-xl flex flex-col items-center justify-center relative transition-all text-xs ${
                 isSelected
                   ? "bg-indigo-600 text-white font-bold shadow-sm"
                   : isToday
@@ -113,6 +121,12 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
               }`}
             >
               <span>{day}</span>
+
+              {total > 0 && (
+                <span className={`text-[9px] leading-tight mt-0.5 ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
+                  ¥{formatCompact(total)}
+                </span>
+              )}
 
               {/* 出費上位3日の赤丸マーク */}
               {isTop3 && (

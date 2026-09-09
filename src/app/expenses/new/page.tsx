@@ -1,23 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { addExpense } from "@/lib/expenses";
 import { formatDateToKey } from "@/lib/dashboard-calc";
 
-export default function NewExpensePage() {
+function NewExpenseContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [date, setDate] = useState<string>(formatDateToKey(new Date()));
+  const initialDate = searchParams.get("date") ?? formatDateToKey(new Date());
+
+  const [date, setDate] = useState<string>(initialDate);
   const [name, setName] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // 認証チェック：未ログインなら /login へ誘導
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
@@ -55,6 +57,7 @@ export default function NewExpensePage() {
         spentAt,
       });
 
+      setSubmitting(false);
       router.push("/");
     } catch (error) {
       console.error(error);
@@ -137,5 +140,13 @@ export default function NewExpensePage() {
         </form>
       </main>
     </div>
+  );
+}
+
+export default function NewExpensePage() {
+  return (
+    <Suspense>
+      <NewExpenseContent />
+    </Suspense>
   );
 }

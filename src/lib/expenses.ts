@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   query,
   setDoc,
@@ -138,6 +139,19 @@ export async function deleteExpense(
   );
 
   await deleteDoc(expenseRef);
+}
+
+/**
+ * Google Calendar由来の出費をすべて削除する
+ */
+export async function deleteAllCalendarExpenses(uid: string): Promise<void> {
+  if (!uid) throw new Error("ユーザーIDがありません。");
+
+  const expensesRef = collection(db, "users", uid, "expenses");
+  const q = query(expensesRef, where("source", "==", "google-calendar"));
+  const snapshot = await getDocs(q);
+
+  await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
 }
 
 /**

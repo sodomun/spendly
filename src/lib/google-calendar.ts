@@ -133,6 +133,83 @@ export async function listGoogleCalendarEvents(
   return events;
 }
 
+function removeExpenseLine(description: string, itemIndex: number): string {
+  const lines = description.split(/\r?\n/);
+  let count = 0;
+  const result = lines.filter((rawLine) => {
+    const line = rawLine.trim().normalize("NFKC");
+    if (!line) return true;
+    const match = line.match(
+      /^(.+?)(?:\s+|[:,]\s*)[¥￥]?\s*([0-9][0-9,]*)\s*円?\s*$/
+    );
+    if (!match) return true;
+    if (count === itemIndex) {
+      count++;
+      return false;
+    }
+    count++;
+    return true;
+  });
+  return result.join("\n").trim();
+}
+
+export async function deleteOrUpdateCalendarExpense(
+  accessToken: string,
+  googleEventId: string,
+  itemIndex: number
+): Promise<void> {
+  const eventUrl = `${ENDPOINT}/${googleEventId}`;
+
+  const getResponse = await fetch(eventUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+
+  if (getResponse.status === 401) {
+    throw new GoogleCalendarApiError(
+      "Google Calendarの認証期限が切れています。Googleで再ログインしてください。",
+      401
+    );
+  }
+  if (!getResponse.ok) {
+    throw new GoogleCalendarApiError(
+      `イベントの取得に失敗しました (HTTP ${getResponse.status})`,
+      getResponse.status
+    );
+  }
+
+  const event = (await getResponse.json()) as { description?: string };
+  const newDescription = removeExpenseLine(event.description ?? "", itemIndex);
+
+  if (!newDescription) {
+    const deleteResponse = await fetch(eventUrl, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!deleteResponse.ok && deleteResponse.status !== 204) {
+      throw new GoogleCalendarApiError(
+        `イベントの削除に失敗しました (HTTP ${deleteResponse.status})`,
+        deleteResponse.status
+      );
+    }
+  } else {
+    const patchResponse = await fetch(eventUrl, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ description: newDescription }),
+    });
+    if (!patchResponse.ok) {
+      throw new GoogleCalendarApiError(
+        `イベントの更新に失敗しました (HTTP ${patchResponse.status})`,
+        patchResponse.status
+      );
+    }
+  }
+}
+
 export async function importExpensesFromGoogleCalendar(
   uid: string,
   accessToken: string,

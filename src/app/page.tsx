@@ -16,7 +16,7 @@ import { MonthlyCalendar } from "@/components/dashboard/MonthlyCalendar";
 import { ExpenseList } from "@/components/dashboard/ExpenseList";
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, googleAccessToken } = useAuth();
   const router = useRouter();
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -39,11 +39,14 @@ export default function DashboardPage() {
     const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
     const unsubscribe = subscribeExpenses(user.uid, startOfMonth, endOfMonth, (data) => {
-      setExpenses(data);
+      const filtered = googleAccessToken
+        ? data
+        : data.filter((e) => e.source !== "google-calendar");
+      setExpenses(filtered);
     });
 
     return () => unsubscribe();
-  }, [user, currentDate]);
+  }, [user, currentDate, googleAccessToken]);
 
   // 日・週・月ごとの絞り込み
   const { filteredExpenses, periodLabel } = useMemo(() => {
@@ -70,6 +73,16 @@ export default function DashboardPage() {
   // 出費上位3日（月間）
   const topExpenseDays = useMemo(() => {
     return getTopExpenseDays(expenses, 3);
+  }, [expenses]);
+
+  // 日別合計
+  const dailyTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const expense of expenses) {
+      const key = formatDateToKey(expense.spentAt);
+      totals[key] = (totals[key] ?? 0) + expense.amount;
+    }
+    return totals;
   }, [expenses]);
 
   const totalAmount = useMemo(() => {
@@ -107,10 +120,16 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Spendly</h1>
           <div className="flex items-center gap-2">
             <Link
-              href="/settings"
+              href="/settings/calendar"
               className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full font-medium transition-colors"
             >
               Google Calendar
+            </Link>
+            <Link
+              href="/settings/account"
+              className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full font-medium transition-colors"
+            >
+              アカウント設定
             </Link>
           </div>
         </div>
@@ -150,9 +169,9 @@ export default function DashboardPage() {
             currentDate={currentDate}
             selectedDate={selectedDate}
             topExpenseDays={topExpenseDays}
+            dailyTotals={dailyTotals}
             onSelectDate={(date) => {
               setSelectedDate(date);
-              // 日付をクリックした際は「日」ビューに切り替えることも可能
             }}
             onPrevMonth={handlePrevMonth}
             onNextMonth={handleNextMonth}
@@ -169,10 +188,16 @@ export default function DashboardPage() {
         </section>
       </main>
 
-      {/* 追加フローティングボタン */}
-      <div className="fixed bottom-6 right-6 max-w-md">
+      {/* フローティングボタン */}
+      <div className="fixed bottom-6 right-6 flex items-center gap-3">
         <Link
-          href="/expenses/new"
+          href={`/expenses/delete?date=${formatDateToKey(selectedDate)}`}
+          className="flex items-center justify-center w-12 h-12 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-transform active:scale-95 text-xl"
+        >
+          －
+        </Link>
+        <Link
+          href={`/expenses/new?date=${formatDateToKey(selectedDate)}`}
           className="flex items-center justify-center w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg transition-transform active:scale-95 text-2xl font-light"
         >
           ＋
