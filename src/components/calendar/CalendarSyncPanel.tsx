@@ -7,6 +7,7 @@ import {
   GoogleCalendarApiError,
   importExpensesFromGoogleCalendar,
 } from "@/lib/google-calendar";
+import { deleteAllCalendarExpenses } from "@/lib/expenses";
 
 function currentMonthValue() {
   const now = new Date();
@@ -39,6 +40,8 @@ export function CalendarSyncPanel() {
     loading,
     googleAccessToken,
     signInWithGoogle,
+    disconnectCalendar,
+    clearCalendarToken,
   } = useAuth();
 
   const [targetMonth, setTargetMonth] = useState(currentMonthValue);
@@ -118,6 +121,7 @@ export function CalendarSyncPanel() {
       console.error("Google Calendar同期エラー:", e);
 
       if (e instanceof GoogleCalendarApiError) {
+        if (e.status === 401) clearCalendarToken();
         setError(e.message);
       } else if (e instanceof Error) {
         setError(
@@ -158,6 +162,12 @@ export function CalendarSyncPanel() {
             : "再認証が必要"}
         </p>
 
+        {googleAccessToken && user?.email && (
+          <p className="mt-1 text-sm text-zinc-500">
+            同期アカウント: {user.email}
+          </p>
+        )}
+
         {!googleAccessToken && (
           <button
             type="button"
@@ -168,6 +178,16 @@ export function CalendarSyncPanel() {
             {reauthenticating
               ? "再ログイン中..."
               : "Googleで再ログイン"}
+          </button>
+        )}
+
+        {googleAccessToken && (
+          <button
+            type="button"
+            onClick={disconnectCalendar}
+            className="mt-3 rounded-xl border border-red-300 px-4 py-2 text-red-600 hover:bg-red-50"
+          >
+            Google Calendar連携をやめる
           </button>
         )}
       </div>
@@ -226,15 +246,18 @@ export function CalendarSyncPanel() {
       )}
 
       <div className="rounded-2xl bg-zinc-100 p-5">
-        <p className="font-medium">入力例</p>
+        <p className="font-medium">Google Calendar での入力例</p>
 
-        <pre className="mt-2 whitespace-pre-wrap">
-{`タイトル: 出費
-
-昼食 850
-コーヒー 180
-電車 230`}
-        </pre>
+        <div className="mt-3 space-y-2 text-sm">
+          <div>
+            <p className="text-xs text-zinc-500">「タイトル」</p>
+            <pre className="mt-0.5">出費</pre>
+          </div>
+          <div>
+            <p className="text-xs text-zinc-500">「説明」</p>
+            <pre className="mt-0.5">{`昼食 850\nコーヒー 180\n電車 230`}</pre>
+          </div>
+        </div>
       </div>
     </div>
   );
